@@ -39,6 +39,8 @@ namespace AKVEnclaveExample
                 string cekName = "CEK_WITH_HSM";
                 string tblName = "HSM_TEST_TABLE";
 
+                ValidateNonEmptyAKVPath(s_akvUrl, s_trustedEndPoint);
+
                 sqlConnection.Open();
 
                 // Create Column Master Key with AKV Url
@@ -135,6 +137,26 @@ namespace AKVEnclaveExample
                 command.CommandText = sql;
                 command.ExecuteNonQuery();
             }
+        }
+
+
+
+        /// <summary>
+        /// Checks if the Azure Key Vault key path is Empty or Null (and raises exception if they are).
+        /// </summary>
+        internal static void ValidateNonEmptyAKVPath(string masterKeyPath, string trustedEndPoint)
+        {            
+            Uri.TryCreate(masterKeyPath, UriKind.Absolute, out Uri parsedUri);
+
+            // A valid URI.
+            // Check if it is pointing to trusted endpoint.            
+            if (parsedUri.Host.EndsWith(trustedEndPoint, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            // Return an error indicating that the AKV url is invalid.
+            throw new ArgumentException("nvalid Azure Key Vault key path specified.");
         }
     }
 }
