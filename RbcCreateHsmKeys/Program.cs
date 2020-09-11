@@ -13,10 +13,10 @@ namespace AKVEnclaveExample
         static readonly string s_algorithm = "RSA_OAEP";
 
         // ********* Provide details here ***********
-        static readonly string s_akvUrl = "https://{KeyVaultName}.vault.azure.net/keys/{Key}/{KeyIdentifier}";
+        static readonly string s_akvUrl = "https://{KeyVaultName}.managedhsm-preview.azure.net/keys/{Key}/{KeyIdentifier}";
         static readonly string s_clientId = "{Application_Client_ID}";
         static readonly string s_clientSecret = "{Application_Client_Secret}";
-        static readonly string s_connectionString = "Server={Server}; Database={database}; Integrated Security=true; Column Encryption Setting=Enabled; Attestation Protocol=HGS; Enclave Attestation Url = {attestation_url_for_HGS};";
+        static readonly string s_connectionString = "Server={Server}; Database={database}; Integrated Security=true; Column Encryption Setting=Enabled; Attestation Protocol={protocol}; Enclave Attestation Url = {attestation_url};";
         static readonly string s_trustedEndPoint = "https://managedhsm-preview.azure.net";
         // ******************************************
 
@@ -35,25 +35,22 @@ namespace AKVEnclaveExample
             // Create connection to database
             using (SqlConnection sqlConnection = new SqlConnection(s_connectionString))
             {
-                string cmkName = "CMK_WITH_HSM";
-                string cekName = "CEK_WITH_HSM";
-                string tblName = "HSM_TEST_TABLE";
+                string cmkName = "CMK_WITH_AKV";
+                string cekName = "CEK_WITH_AKV";
+                string tblName = "AKV_TEST_TABLE";
+                    sqlConnection.Open();
 
-                ValidateNonEmptyAKVPath(s_akvUrl, s_trustedEndPoint);
+                    // Create Column Master Key with AKV Url
+                    createCMK(sqlConnection, cmkName, sqlColumnEncryptionAzureKeyVaultProvider);
+                    Console.WriteLine("Column Master Key created.");
 
-                sqlConnection.Open();
+                    // Create Column Encryption Key
+                    createCEK(sqlConnection, cmkName, cekName, sqlColumnEncryptionAzureKeyVaultProvider);
+                    Console.WriteLine("Column Encryption Key created.");
 
-                // Create Column Master Key with AKV Url
-                createCMK(sqlConnection, cmkName, sqlColumnEncryptionAzureKeyVaultProvider);
-                Console.WriteLine("Column Master Key created.");
-
-                // Create Column Encryption Key
-                createCEK(sqlConnection, cmkName, cekName, sqlColumnEncryptionAzureKeyVaultProvider);
-                Console.WriteLine("Column Encryption Key created.");
-
-                // Create Table with Encrypted Columns
-                createTbl(sqlConnection, cekName, tblName);
-                Console.WriteLine("Table created with Encrypted columns.");
+                    // Create Table with Encrypted Columns
+                    createTbl(sqlConnection, cekName, tblName);
+                    Console.WriteLine("Table created with Encrypted columns.");
             }
         }
 
@@ -137,26 +134,6 @@ namespace AKVEnclaveExample
                 command.CommandText = sql;
                 command.ExecuteNonQuery();
             }
-        }
-
-
-
-        /// <summary>
-        /// Checks if the Azure Key Vault key path is Empty or Null (and raises exception if they are).
-        /// </summary>
-        internal static void ValidateNonEmptyAKVPath(string masterKeyPath, string trustedEndPoint)
-        {            
-            Uri.TryCreate(masterKeyPath, UriKind.Absolute, out Uri parsedUri);
-
-            // A valid URI.
-            // Check if it is pointing to trusted endpoint.            
-            if (parsedUri.Host.EndsWith(trustedEndPoint, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            // Return an error indicating that the AKV url is invalid.
-            throw new ArgumentException("nvalid Azure Key Vault key path specified.");
         }
     }
 }
